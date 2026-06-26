@@ -101,6 +101,7 @@ struct WaylandWindow {
     uint16 bufferScale = 1;
     bool isVisible:1 = true;
     bool isFullscreen:1 = false;
+    bool isMaximised:1 = false;
     bool isMinimised:1 = false;
     bool isActivated:1 = false;
     bool ignoresMouse:1 = false;
@@ -332,11 +333,14 @@ WaylandWindow* WaylandWindowSystem::createWindow (bool isSubsurface, ComponentPe
                 int windowState;
                 if (WaylandSymbols::getInstance()->decorConfigurationGetWindowState (configuration, &windowState))
                 {
+                    // Keep the existing fullscreen flag for backward compatibility,
+                    // but track maximize separately so PlugData can remove its shadow margin.
                     w->isFullscreen = windowState & (LIBDECOR_WINDOW_STATE_TILED_LEFT  |
                                                      LIBDECOR_WINDOW_STATE_TILED_RIGHT |
                                                      LIBDECOR_WINDOW_STATE_TILED_TOP   |
                                                      LIBDECOR_WINDOW_STATE_TILED_BOTTOM |
                                                      LIBDECOR_WINDOW_STATE_MAXIMIZED);
+                    w->isMaximised = windowState & LIBDECOR_WINDOW_STATE_MAXIMIZED;
                     w->isActivated = windowState & LIBDECOR_WINDOW_STATE_ACTIVE;
                     if (w->isActivated) w->isMinimised = false;
                 }
@@ -795,6 +799,9 @@ void WaylandWindowSystem::setVisible (WaylandWindow* window, bool shouldBeVisibl
 
 void WaylandWindowSystem::setFullscreen (WaylandWindow* window, bool shouldBeFullscreen)
 {
+    // Note: on Wayland we currently use libdecor's maximize as a proxy for fullscreen,
+    // because true fullscreen protocol support is not implemented. PlugData uses the
+    // dedicated setMaximised path for actual maximize requests.
     if (! window->parentWindow)
     {
         if (shouldBeFullscreen)
@@ -803,6 +810,23 @@ void WaylandWindowSystem::setFullscreen (WaylandWindow* window, bool shouldBeFul
             WaylandSymbols::getInstance()->decorFrameUnsetMaximized (window->handle.frame);
     }
     window->isFullscreen = shouldBeFullscreen;
+}
+
+void WaylandWindowSystem::setMaximised (WaylandWindow* window, bool shouldBeMaximised)
+{
+    if (! window->parentWindow)
+    {
+        if (shouldBeMaximised)
+            WaylandSymbols::getInstance()->decorFrameSetMaximized (window->handle.frame);
+        else
+            WaylandSymbols::getInstance()->decorFrameUnsetMaximized (window->handle.frame);
+    }
+    window->isMaximised = shouldBeMaximised;
+}
+
+bool WaylandWindowSystem::isMaximised (WaylandWindow* window)
+{
+    return window->isMaximised;
 }
 
 void WaylandWindowSystem::setMinimised (WaylandWindow* window, bool shouldBeMinimised)

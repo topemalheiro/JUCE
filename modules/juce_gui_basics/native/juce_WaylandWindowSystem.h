@@ -49,8 +49,10 @@ public:
     void toBehind (WaylandWindow* window, WaylandWindow* otherWindow);
     void setVisible (WaylandWindow* window, bool shouldBeVisible);
     void setFullscreen (WaylandWindow* window, bool shouldBeFullscreen);
+    void setMaximised (WaylandWindow* window, bool shouldBeMaximised);
     void setMinimised (WaylandWindow* window, bool shouldBeMinimised);
     bool isFullscreen (WaylandWindow* window);
+    bool isMaximised (WaylandWindow* window);
     bool isMinimised (WaylandWindow* window);
     void updateConstraints (WaylandWindow* window) const;
     
