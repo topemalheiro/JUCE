@@ -98,7 +98,6 @@ struct WaylandWindow {
     std::unique_ptr<WaylandShmBuffer> currentBuffer = nullptr;
     std::set<wl_output*> displays;
     Rectangle<int> bounds;
-    Rectangle<int> lastConfigureBounds;
     uint16 bufferScale = 1;
     bool isVisible:1 = true;
     bool isFullscreen:1 = false;
@@ -367,40 +366,6 @@ WaylandWindow* WaylandWindowSystem::createWindow (bool isSubsurface, ComponentPe
                 {
                     if (width > 0 && height > 0)
                     {
-                        // KWin can send intermediate configure events without the MAXIMIZED flag
-                        // before the final maximized state arrives. If the new size matches a
-                        // known display (allowing for a top panel), treat it as maximized so the
-                        // client can remove its shadow margin immediately.
-                        auto const oldArea = w->lastConfigureBounds.getWidth() * w->lastConfigureBounds.getHeight();
-                        auto const newArea = width * height;
-
-                        if (! w->isMaximised && oldArea > 0 && newArea > 0)
-                        {
-                            if (newArea < oldArea - (oldArea / 3))
-                            {
-                                w->isMaximised = false;
-                            }
-                            else
-                            {
-                                for (auto const& display : getInstance()->displays)
-                                {
-                                    if (! display.isDone)
-                                        continue;
-
-                                    auto const& db = display.bounds;
-                                    auto const widthMatch = std::abs (width - db.getWidth()) <= 8;
-                                    auto const heightMatch = std::abs (height - db.getHeight()) <= 48;
-
-                                    if (widthMatch && heightMatch)
-                                    {
-                                        w->isMaximised = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        w->lastConfigureBounds.setSize (width, height);
                         w->bounds.setSize (width, height);
                         w->peer->setBounds (Rectangle<int>(0, 0, width, height), w->isFullscreen);
                         w->peer->repaint (Rectangle<int>(0, 0, width, height));
@@ -861,7 +826,9 @@ void WaylandWindowSystem::setMaximised (WaylandWindow* window, bool shouldBeMaxi
 
 bool WaylandWindowSystem::isMaximised (WaylandWindow* window)
 {
-    return window->isMaximised;
+    // Tiled / edge-snapped windows are compositor-managed on one or more edges,
+    // so report them as maximized so the client can drop its shadow margin.
+    return window->isMaximised || window->isFullscreen;
 }
 
 void WaylandWindowSystem::setMinimised (WaylandWindow* window, bool shouldBeMinimised)

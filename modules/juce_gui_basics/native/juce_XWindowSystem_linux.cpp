@@ -116,6 +116,12 @@ XWindowSystemUtilities::Atoms::Atoms (::Display* display)
     windowStateHidden            = getIfExists (display, "_NET_WM_STATE_HIDDEN");
 
     GTKFrameExtents              = getIfExists (display, "_GTK_FRAME_EXTENTS");
+    windowStateTiledLeft         = getIfExists (display, "_NET_WM_STATE_TILED_LEFT");
+    windowStateTiledRight        = getIfExists (display, "_NET_WM_STATE_TILED_RIGHT");
+    windowStateTiledTop          = getIfExists (display, "_NET_WM_STATE_TILED_TOP");
+    windowStateTiledBottom       = getIfExists (display, "_NET_WM_STATE_TILED_BOTTOM");
+    windowStateMaximizedVert     = getIfExists (display, "_NET_WM_STATE_MAXIMIZED_VERT");
+    windowStateMaximizedHorz     = getIfExists (display, "_NET_WM_STATE_MAXIMIZED_HORZ");
 
     XdndAware                    = getCreating (display, "XdndAware");
     XdndEnter                    = getCreating (display, "XdndEnter");
@@ -1793,6 +1799,58 @@ void XWindowSystem::setFrameExtents(::Window windowH, bool enabled) const
     long margin = enabled ? std::ceil(18 * Desktop::getInstance().getGlobalScaleFactor()) : 0;
     long extents[4] = { margin, margin, margin, margin };
     xchangeProperty(windowH, atoms.GTKFrameExtents, XA_CARDINAL, 32, (unsigned char*) extents, 4);
+}
+
+void XWindowSystem::updateFrameExtentsForWindowState (::Window windowH) const
+{
+    if (auto* peer = getPeerFor (windowH))
+        if (peer->getStyleFlags() & ComponentPeer::windowHasTitleBar)
+            return; // native titlebar manages its own frame
+
+    if (atoms.windowState == None)
+        return;
+
+    Atom actualType;
+    int actualFormat;
+    unsigned long numItems, bytesAfter;
+    unsigned char* data = nullptr;
+
+    bool isEdgeManaged = false;
+
+    {
+        XWindowSystemUtilities::ScopedXLock xLock;
+
+        if (X11Symbols::getInstance()->xGetWindowProperty (display, windowH, atoms.windowState,
+                                                           0, 1024, False, XA_ATOM,
+                                                           &actualType, &actualFormat,
+                                                           &numItems, &bytesAfter, &data) == Success)
+        {
+            if (actualType == XA_ATOM && actualFormat == 32 && data != nullptr)
+            {
+                auto* states = reinterpret_cast<Atom*> (data);
+
+                for (unsigned long i = 0; i < numItems; ++i)
+                {
+                    if (states[i] == atoms.windowStateMaximizedVert
+                        || states[i] == atoms.windowStateMaximizedHorz
+                        || states[i] == atoms.windowStateTiledLeft
+                        || states[i] == atoms.windowStateTiledRight
+                        || states[i] == atoms.windowStateTiledTop
+                        || states[i] == atoms.windowStateTiledBottom
+                        || states[i] == XWindowSystemUtilities::Atoms::getIfExists (display, "_NET_WM_STATE_FULLSCREEN"))
+                    {
+                        isEdgeManaged = true;
+                        break;
+                    }
+                }
+            }
+
+            if (data != nullptr)
+                X11Symbols::getInstance()->xFree (data);
+        }
+    }
+
+    setFrameExtents (windowH, ! isEdgeManaged);
 }
 
 void XWindowSystem::setVisible (::Window windowH, bool shouldBeVisible) const
@@ -3974,8 +4032,9 @@ void XWindowSystem::propertyNotifyEvent (LinuxComponentPeer* peer, const XProper
 
     if (event.atom == atoms.windowState)
     {
+        updateFrameExtentsForWindowState (event.window);
         peer->handleMovedOrResized();
-        peer->repaint();
+        peer->repaint (peer->getBounds());
     }
 }
 

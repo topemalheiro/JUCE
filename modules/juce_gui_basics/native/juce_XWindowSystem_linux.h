@@ -96,6 +96,8 @@ namespace XWindowSystemUtilities
         static constexpr unsigned long DndVersion = 3;
 
         Atom protocols, protocolList[4], xSyncCounter, changeState, state, activeWin, pid, windowType, windowState, windowStateHidden, GTKFrameExtents,
+             windowStateTiledLeft, windowStateTiledRight, windowStateTiledTop, windowStateTiledBottom,
+             windowStateMaximizedVert, windowStateMaximizedHorz,
              XdndAware, XdndEnter, XdndLeave, XdndPosition, XdndStatus, XdndDrop, XdndFinished, XdndSelection,
              XdndTypeList, XdndActionList, XdndActionDescription, XdndActionCopy, XdndActionPrivate,
              XembedMsgType, XembedInfo, allowedActions[5], allowedMimeTypes[4], utf8String, clipboard, targets;
@@ -261,6 +263,10 @@ public:
     static String getThemeNameSettingName()            { return "Net/ThemeName"; }
 
     void setFrameExtents(::Window windowH, bool enabled) const;
+
+    /** Reads _NET_WM_STATE and enables/disables _GTK_FRAME_EXTENTS so the
+        compositor and client agree on the shadow margin for maximized/tiled windows. */
+    void updateFrameExtentsForWindowState (::Window windowH) const;
 
     //==============================================================================
     void handleWindowMessage (LinuxComponentPeer*, XEvent&) const;
