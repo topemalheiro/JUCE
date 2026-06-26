@@ -3971,6 +3971,12 @@ void XWindowSystem::propertyNotifyEvent (LinuxComponentPeer* peer, const XProper
 
     if (event.atom == XWindowSystemUtilities::Atoms::getIfExists (display, "_NET_FRAME_EXTENTS"))
         peer->updateBorderSize();
+
+    if (event.atom == atoms.windowState)
+    {
+        peer->handleMovedOrResized();
+        peer->repaint();
+    }
 }
 
 void XWindowSystem::handleMappingNotify (XMappingEvent& mappingEvent) const
