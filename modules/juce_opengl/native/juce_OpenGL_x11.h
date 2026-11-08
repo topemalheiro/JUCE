@@ -411,7 +411,12 @@ public:
 
     void updateWindowPosition (Rectangle<int> newBounds)
     {
-        auto physicalBounds = Desktop::getInstance().getDisplays().logicalToPhysical (newBounds);
+        // The peer's own scale, as getPhysicalBounds() uses: a plugin host's scale factor
+        // (setCustomPlatformScaleFactor) is in it but not in the display's, and the context
+        // renders at the peer's scale, so the display's would size the window too small for it
+        auto* peer = component.getPeer();
+        auto physicalBounds = peer != nullptr ? (newBounds.toDouble() * peer->getPlatformScaleFactor()).toNearestInt()
+                                              : Desktop::getInstance().getDisplays().logicalToPhysical (newBounds);
 
         XWindowSystemUtilities::ScopedXLock xLock;
         X11Symbols::getInstance()->xMoveResizeWindow (display, embeddedWindow,
